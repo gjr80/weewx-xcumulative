@@ -5,7 +5,6 @@ The *Cumulative XType* extension is a WeeWX extension that installs an XType tha
 
 The extension consists of a single WeeWX XType and an associated WeeWX service. A single config option *reset* is supported that allows the user to specify the date-time conditions that reset the cumulative data.
 
-
 ## Pre-requisites
 The *Cumulative XType* extension requires WeeWX v4.0.0 or greater and will operate under Python 2 or Python 3.
 
