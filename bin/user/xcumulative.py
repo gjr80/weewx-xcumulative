@@ -18,6 +18,26 @@ Version: 0.1.0                                          Date: 2 October 2022
 Revision History
     2 October 2022      v0.1.0
         - initial release
+
+Abbreviated Instruction for Use
+
+1.  Download the Cumulative XType extension package:
+
+    $ wget -P /var/tmp https://github.com/gjr80/weewx-gw1000/releases/download/v0.1.0/xcum-0.1.0.tar.gz
+
+2.  Install the Cumulative XType extension package
+
+    $ wee_extension --install=/var/tmp/xcum-0.1.0.tar.gz
+
+3.  Restart WeeWX:
+
+    $ sudo systemctl restart weewx
+
+You can now use the 'cumulative' aggregate type wherever you need a cumulative
+series, eg ImageGenerator plots. The reset time for the cumulative series data
+may be specified by using the 'reset' option in an ImageGenerator plot
+definition or by passing a 'reset' argument if calling the Cumulative XType
+programmatically.
 """
 
 # python imports
@@ -45,12 +65,33 @@ XCUM_VERSION = '0.1.0'
 class XCumulative(weewx.xtypes.XType):
     """XType to produce cumulative series data with user specified reset times."""
 
+    reset_defs = {'midnight': '00:00',
+                  'midday': '12:00',
+                  'day': '00:00',
+                  'month': '1T00:00',
+                  'year': '01-01T00:00'}
+
     def __init__(self):
         pass
 
     def get_series(self, obs_type, timespan, db_manager, aggregate_type=None,
                    aggregate_interval=None, **option_dict):
-        """Obtain a cumulative series with a user specified reset time."""
+        """Obtain a cumulative series with a user specified reset time.
+
+        The following options are supported in option_dict:
+
+        reset: Date-time specification for cumulative value reset times.
+               Optional string. Format is [mm-][dd][T]HH:MM or one of
+               ('midnight', 'midday', 'day', 'month', 'year'). Default is no
+               reset.
+        ignore_none: Whether to ignore None values when calculating the
+                     cumulative value. If ignored then data points for which
+                     the aggregate value is None are excluded from the
+                     resulting vector. If not ignored then data points for
+                     which the aggregate value is None are included in the
+                     resulting vector but the data point does not contribute to
+                     the cumulative value. Optional boolean. Default is True.
+        """
 
         # initialise lists to hold the vectors that will make up our result
         start_vec = list()
@@ -66,6 +107,12 @@ class XCumulative(weewx.xtypes.XType):
         else:
             # we've been asked for the cumulative aggregation type
 
+            # Are None values to be ignored? The default action is to ignore
+            # the data point if the aggregate for that span/data point is None.
+            # Setting ignore_none = False will include such data points in the
+            # resulting vector.
+            ignore_none = weeutil.weeutil.to_bool(option_dict.get('ignore_none', True))
+            # log.info("obs_type=%s timespan=%s ignore_none=%s option_dict=%s" % (obs_type, timespan, ignore_none, option_dict))
             # first look at the reset option (if it exists) and obtain a list
             # of reset timestamps that will occur in our timespan of interest
             reset = self.parse_reset(option_dict.get('reset'), timespan)
@@ -84,8 +131,9 @@ class XCumulative(weewx.xtypes.XType):
                 # sum aggregate, we will do the cumulative part of the xtype
                 # later
                 agg_vt = weewx.xtypes.get_aggregate(obs_type, span, 'sum', db_manager)
-                # if the aggregate is None then continue to the next span
-                if agg_vt.value is None:
+                # if the aggregate is None, and we are ignoring None values,
+                # then continue to the next span
+                if agg_vt.value is None and ignore_none:
                     continue
                 # check for unit group consistency
                 if unit:
@@ -119,7 +167,7 @@ class XCumulative(weewx.xtypes.XType):
                         # Our stop timestamp is after the current reset
                         # timestamp, so reset the running total to the current
                         # aggregate value.
-                        total = agg_vt.value
+                        total = agg_vt.value if agg_vt.value is not None else 0.0
                         # since we encountered a reset timestamp increment the
                         # reset index
                         reset_index += 1
@@ -134,6 +182,7 @@ class XCumulative(weewx.xtypes.XType):
                     total += agg_vt.value
                 # append the total to our data vector
                 data_vec.append(total)
+        log.info("data_vec=%s" % (data_vec,))
         # convert our result vectors to ValueTuples and return the ValueTuples
         # as a tuple
         return (weewx.units.ValueTuple(start_vec, 'unix_epoch', 'group_time'),
@@ -149,6 +198,13 @@ class XCumulative(weewx.xtypes.XType):
         - mm-ddTHH:MM - reset occurs ate HH:MM on dd-mm of each year
         - YYYY-mm-ddTHH:MM - reset occurs at HH:MM on YYYY-mm-dd
 
+        We could also have a keyword representing a reset time:
+        - midnight - reset occurs at 00:00 daily
+        - midday - reset occurs at 12:00 daily
+        - day - reset occurs at 00:00 daily
+        - month - reset occurs at 00:00 on the 1st of each month
+        - year - reset occurs at 00:00 on the 1st of January
+
         Defaults and handling of invalid formats:
         - if an invalid time or time format is specified midnight is used as
           the time component of the reset option
@@ -162,6 +218,9 @@ class XCumulative(weewx.xtypes.XType):
             # we have no reset option setting so return None
             return None
         else:
+            # do we have a reset specified by keyword, if so set reset_opt accordingly
+            if reset_opt.lower() in XCumulative.reset_defs.keys():
+                reset_opt = XCumulative.reset_defs[reset_opt.lower()]
             # first split on 'T'
             _split = reset_opt.split('T')
             if len(_split) == 1:
