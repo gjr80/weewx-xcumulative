@@ -13,10 +13,10 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-Version: 0.1.0                                          Date: ?? September 2022
+Version: 0.1.0                                          Date: 2 October 2022
 
 Revision History
-    ?? September 2022   v0.1.0
+    2 October 2022      v0.1.0
         - initial release
 """
 
@@ -32,6 +32,7 @@ import weeutil.weeutil
 import weewx.engine
 import weewx.xtypes
 
+# we require WeeWX 4.6.0 or later so we can only use WeeWX 4 logging
 log = logging.getLogger(__name__)
 
 XCUM_VERSION = '0.1.0'
@@ -260,6 +261,7 @@ class XCumulative(weewx.xtypes.XType):
         If no matching timestamps are found return an empty list.
         """
 
+        # initialise an empty list for the result
         ts_list = list()
         # iterate over each day in the timespan of concern
         for day_span in weeutil.weeutil.genDaySpans(timespan.start, timespan.stop):
@@ -283,14 +285,14 @@ class XCumulative(weewx.xtypes.XType):
 
 
 # ==============================================================================
-#                           Class StdCumulativeType
+#                           Class StdCumulativeXType
 # ==============================================================================
 
-class StdCumulativeType(weewx.engine.StdService):
+class StdCumulativeXType(weewx.engine.StdService):
     """Instantiate and register the XCumulative XType."""
 
     def __init__(self, engine, config_dict):
-        super(StdCumulativeType, self).__init__(engine, config_dict)
+        super(StdCumulativeXType, self).__init__(engine, config_dict)
 
         # obtain an XCumulative XType object
         self.xcumulative = XCumulative()
