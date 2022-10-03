@@ -112,7 +112,6 @@ class XCumulative(weewx.xtypes.XType):
             # Setting ignore_none = False will include such data points in the
             # resulting vector.
             ignore_none = weeutil.weeutil.to_bool(option_dict.get('ignore_none', True))
-            # log.info("obs_type=%s timespan=%s ignore_none=%s option_dict=%s" % (obs_type, timespan, ignore_none, option_dict))
             # first look at the reset option (if it exists) and obtain a list
             # of reset timestamps that will occur in our timespan of interest
             reset = self.parse_reset(option_dict.get('reset'), timespan)
@@ -179,10 +178,9 @@ class XCumulative(weewx.xtypes.XType):
                 else:
                     # we have no reset timestamps, so just add the current
                     # aggregate to the running total
-                    total += agg_vt.value
+                    total += agg_vt.value if agg_vt.value is not None else 0.0
                 # append the total to our data vector
                 data_vec.append(total)
-        log.info("data_vec=%s" % (data_vec,))
         # convert our result vectors to ValueTuples and return the ValueTuples
         # as a tuple
         return (weewx.units.ValueTuple(start_vec, 'unix_epoch', 'group_time'),
