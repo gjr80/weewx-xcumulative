@@ -8,12 +8,11 @@ provides cumulative series data with a flexible, user settable reset date-time.
 When used with the WeeWX image generator this enables the generation of
 cumulative plots that reset at a specified time or date and time. For example,
 a cumulative rain plot can be produced for a day with the rainfall resetting to
-zero at midnight or a cumulative rain plot can be produced for a week with the
-rainfall resetting to zero at 9am daily.
+zero at midnight.
 
 The extension consists of a single WeeWX XType and an associated WeeWX service.
-A single config option 'reset' is supported that allows the user to specify the
-date-time conditions that reset the cumulative data.
+A number of config options can be used to control the operation of the
+Cumulative XType.
 
 
 Pre-requisites

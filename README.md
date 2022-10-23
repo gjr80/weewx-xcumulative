@@ -6,7 +6,7 @@ The *Cumulative XType* extension is a WeeWX extension that installs an XType tha
 
 ![Rainfall since midnight](https://github.com/gjr80/weewx-xcumulative/blob/main/assets/daycumulativerain.png)
 
-The extension consists of a single WeeWX XType and an associated WeeWX service. A single config option *reset* is supported that allows the user to specify the date-time conditions that reset the cumulative data.
+The extension consists of a single WeeWX XType and an associated WeeWX service. A number of config options can be used to control the operation of the *Cumulative XType*.
 
 
 ## Pre-requisites
