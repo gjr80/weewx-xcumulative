@@ -13,9 +13,11 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-Version: 0.1.0                                          Date: 23 October 2022
+Version: 0.2.0                                          Date: ?? October 2022
 
 Revision History
+    ?? October 2022     v0.2.0
+        - implement support for zero_lead_in
     23 October 2022     v0.1.0
         - initial release
 
@@ -23,11 +25,11 @@ Abbreviated Instruction for Use
 
 1.  Download the Cumulative XType extension package:
 
-    $ wget -P /var/tmp https://github.com/gjr80/weewx-gw1000/releases/download/v0.1.0/xcum-0.1.0.tar.gz
+    $ wget -P /var/tmp https://github.com/gjr80/weewx-gw1000/releases/download/v0.2.0/xcum-0.2.0.tar.gz
 
 2.  Install the Cumulative XType extension package
 
-    $ wee_extension --install=/var/tmp/xcum-0.1.0.tar.gz
+    $ wee_extension --install=/var/tmp/xcum-0.2.0.tar.gz
 
 3.  Restart WeeWX:
 
@@ -55,7 +57,7 @@ import weewx.xtypes
 # we require WeeWX 4.6.0 or later so we can only use WeeWX 4 logging
 log = logging.getLogger(__name__)
 
-XCUM_VERSION = '0.1.0'
+XCUM_VERSION = '0.2.0'
 
 
 # ==============================================================================
@@ -91,6 +93,14 @@ class XCumulative(weewx.xtypes.XType):
                      which the aggregate value is None are included in the
                      resulting vector but the data point does not contribute to
                      the cumulative value. Optional boolean. Default is True.
+        zero_lead_in: Whether all aggregate values before the first reset
+                      timestamp are set to zero or not. If set True all
+                      aggregate values before the first reset timestamp are
+                      effectively set to zero. If False the aggregate values
+                      are treated as normal and added to the cumulative value
+                      until a reset occurs. zero_lead_in has no effect if there
+                      are no reset timestamps withing the aggregate timespan.
+                      Optional boolean. Default is False.
         """
 
         # initialise lists to hold the vectors that will make up our result
@@ -111,7 +121,12 @@ class XCumulative(weewx.xtypes.XType):
             # the data point if the aggregate for that span/data point is None.
             # Setting ignore_none = False will include such data points in the
             # resulting vector.
-            ignore_none = weeutil.weeutil.to_bool(option_dict.get('ignore_none', True))
+            ignore_none = weeutil.weeutil.to_bool(option_dict.get('ignore_none',
+                                                                  True))
+            # Are we using a zero lead in? The default is to not use a zero
+            # lead in.
+            zero_lead_in = weeutil.weeutil.to_bool(option_dict.get('zero_lead_in',
+                                                                   False))
             # first look at the reset option (if it exists) and obtain a list
             # of reset timestamps that will occur in our timespan of interest
             reset = self.parse_reset(option_dict.get('reset'), timespan)
@@ -171,10 +186,11 @@ class XCumulative(weewx.xtypes.XType):
                         # reset index
                         reset_index += 1
                     elif agg_vt.value is not None:
-                        # we haven't encountered a reset time so just add the
-                        # current aggregate to the running total, no need for
-                        # any resets
-                        total += agg_vt.value
+                        # we haven't encountered a reset time. So we can just
+                        # add the current aggregate to the running total,
+                        # unless zero_lead_in is True in which case we ignore
+                        # the current aggregate
+                        total += agg_vt.value if not zero_lead_in else 0.0
                 else:
                     # we have no reset timestamps, so just add the current
                     # aggregate to the running total
