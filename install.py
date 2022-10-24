@@ -10,11 +10,13 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                  Installer for the Cumulative XType Extension
 
-Version: 0.1.0                                          Date: 23 October 2022
+Version: 0.2.0                                          Date: ?? October 2022
 
 Revision History
+    ?? October 2022     v0.2.0
+        - no change, version change only
     23 October 2022     v0.1.0
-        -   initial implementation
+        - initial implementation
 """
 
 # python imports
@@ -26,7 +28,7 @@ import weewx
 
 
 REQUIRED_VERSION = "4.6.0"
-XCUM_VERSION = "0.1.0"
+XCUM_VERSION = "0.2.0"
 
 
 def loader():

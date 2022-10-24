@@ -25,11 +25,11 @@ Installation Instructions
 
 1.  Download the Cumulative XType extension package:
 
-    $ wget -P /var/tmp https://github.com/gjr80/weewx-gw1000/releases/download/v0.1.0/xcum-0.1.0.tar.gz
+    $ wget -P /var/tmp https://github.com/gjr80/weewx-gw1000/releases/download/v0.2.0/xcum-0.2.0.tar.gz
 
 2.  Install the Cumulative XType extension:
 
-    $ wee_extension --install=/var/tmp/xcum-0.1.0.tar.gz
+    $ wee_extension --install=/var/tmp/xcum-0.2.0.tar.gz
 
     Note: Depending on your system/installation the above command may need
           to be prefixed with sudo.
