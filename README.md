@@ -17,7 +17,7 @@ The *Cumulative XType* extension requires WeeWX v4.6.0 or greater and will opera
 
 1.  Download the *Cumulative XType* extension package:
 
-        $ wget -P /var/tmp https://github.com/gjr80/weewx-gw1000/releases/download/v0.1.0/xcum-0.1.0.tar.gz
+        $ wget -P /var/tmp https://github.com/gjr80/weewx-xcumulative/releases/download/v0.1.0/xcum-0.1.0.tar.gz
 
 2.  Install the *Cumulative XType* extension:
 
