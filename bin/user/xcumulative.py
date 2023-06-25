@@ -129,7 +129,8 @@ class XCumulative(weewx.xtypes.XType):
                                                                    False))
             # first look at the reset option (if it exists) and obtain a list
             # of reset timestamps that will occur in our timespan of interest
-            reset = self.parse_reset(option_dict.get('reset'), timespan)
+            reset, pre_reset_ts = self.parse_reset(option_dict.get('reset'), timespan)
+            # TODO. Do we need to align on aggregate_interval boundary
             # our unit and unit group are None until we get some data
             unit, unit_group = None, None
             # initialise our running total
@@ -206,6 +207,13 @@ class XCumulative(weewx.xtypes.XType):
     def parse_reset(self, reset_opt, timespan):
         """Parse a reset option setting.
 
+        Parse a reset option setting and return a list of timestamps that
+        matches the reset option setting. The list includes timestamps that
+        fall within the timespan concerned as well as the last matching reset
+        timestamp (if it exists) before the timespan. Also returns the last
+        timestamp that falls on an aggregate period boundary before the last
+        matching reset timestamp (if it exists) before the timespan.
+
         We could have a reset option in any of the following:
         - HH:MM - reset occurs at HH:MM daily
         - ddTHH:MM - reset occurs at HH:MM on the dd day of each month
@@ -228,9 +236,12 @@ class XCumulative(weewx.xtypes.XType):
           occurs at midnight at the end of the month concerned
         """
 
+        # initialise variable to hold reset timestamp immediately before
+        # timespan of concern
+        pre_reset_ts = None
         if reset_opt is None:
             # we have no reset option setting so return None
-            return None
+            return None, pre_reset_ts
         else:
             # do we have a reset specified by keyword, if so set reset_opt accordingly
             if reset_opt.lower() in XCumulative.reset_defs.keys():
@@ -254,11 +265,18 @@ class XCumulative(weewx.xtypes.XType):
                 # obtain the hour and minute components, first split on ':'
                 _split_time = _split[0].split(':')
                 # obtain and add the hour and minute components to our dict
+                # TODO. Should we also set seconds to zero ?
                 dt_params['hour'] = int(_split_time[0])
                 dt_params['minute'] = int(_split_time[1])
                 # obtain the list of reset timestamps for the timespan of
                 # interest
                 reset_list = self.get_ts_list(timespan, **dt_params)
+                # determine the pre_reset_ts
+                # get the timestamp 24 hours before the timespan start
+                _dt_start = datetime.datetime.fromtimestamp(timespan.start)
+                _dt_previous = _dt_start - datetime.timedelta(days=1)
+                _pre_reset_dt = _dt_previous.replace(**dt_params)
+                pre_reset_ts = int(time.mktime(_pre_reset_dt.timetuple()))
             elif len(_split) == 2:
                 # we have a 'T', so we need to look for date and time
                 # components
@@ -280,6 +298,7 @@ class XCumulative(weewx.xtypes.XType):
                     # and minute components
                     _split_time = _split[1].split(':')
                     # obtain and add the hour and minute components to our dict
+                    # TODO. Should we also set seconds to zero ?
                     dt_params['hour'] = int(_split_time[0])
                     dt_params['minute'] = int(_split_time[1])
                 # Now look at the date. We only accept a limited number of date
@@ -310,6 +329,36 @@ class XCumulative(weewx.xtypes.XType):
                     finally:
                         # now we can produce the reset timestamp list
                         reset_list = self.get_ts_list(timespan, **dt_params)
+                        # now determine the pre_reset_ts
+                        _dt_start = datetime.datetime.fromtimestamp(timespan.start)
+                        _dt = _dt_start.replace(**dt_params)
+                        _dt_ts = int(time.mktime(_dt.timetuple()))
+                        if 'year' in dt_params:
+                            pre_reset_ts = _dt_ts if _dt_ts < timespan.start else None
+                        elif 'month' in dt_params:
+                            if _dt_ts < timespan.start:
+                                pre_reset_ts = _dt_ts
+                            else:
+                                try:
+                                    _dt_last_year = _dt.replace(year=_dt.year - 1)
+                                except ValueError:
+                                    _dt_last_year = _dt.replace(year=_dt.year - 1, day=_dt.day - 1)
+                                pre_reset_ts = int(time.mktime(_dt_last_year.timetuple()))
+                        elif 'day' in dt_params:
+                            if _dt_ts < timespan.start:
+                                pre_reset_ts = _dt_ts
+                            else:
+                                if _dt.month == 1:
+                                    _dt_last_month = _dt.replace(year=_dt.year - 1, month=12)
+                                else:
+                                    for offset in range(3):
+                                        try:
+                                            _dt_last_month = _dt.replace(month=_dt.month - 1, day=_dt.day - offset)
+                                        except ValueError:
+                                            continue
+                                        else:
+                                            break
+                                pre_reset_ts = int(time.mktime(_dt_last_month.timetuple()))
                         # even though we may have already finished parsing the
                         # date-time string, check if we successfully parsed the
                         # date string, we could have arrived here having found
@@ -323,7 +372,7 @@ class XCumulative(weewx.xtypes.XType):
                 # we have a reset option we cannot parse
                 _msg = "Cannot parse reset option '%s'"
                 raise weewx.ViolatedPrecondition(_msg)
-            return reset_list
+            return reset_list, pre_reset_ts
 
     @staticmethod
     def get_ts_list(timespan, **dt_params):
@@ -355,6 +404,45 @@ class XCumulative(weewx.xtypes.XType):
                 ts_list.append(_day_reset_ts)
         # return the list of matching timestamps
         return ts_list
+
+    @staticmethod
+    def rev_interval_gen(start_ts, interval, rev_stop_ts):
+        dt1 = datetime.datetime.fromtimestamp(start_ts)
+        rev_stop_dt = datetime.datetime.fromtimestamp(rev_stop_ts)
+
+        # If a string was passed in, convert to seconds using nominal time intervals.
+        interval = weeutil.weeutil.nominal_spans(interval)
+
+        if interval == 365.25 / 12 * 24 * 3600:
+            # Interval is a nominal month. This algorithm is
+            # necessary because not all months have the same length.
+            while dt1 > rev_stop_dt:
+                t_tuple = dt1.timetuple()
+                year = t_tuple[0]
+                month = t_tuple[1]
+                month -= 1
+                if month < 1:
+                    month += 12
+                    year -= 1
+                dt2 = dt1.replace(year=year, month=month)
+                stamp1 = time.mktime(t_tuple)
+                stamp2 = time.mktime(dt2.timetuple())
+                yield TimeSpan(stamp1, stamp2)
+                dt1 = dt2
+        else:
+            # This rather complicated algorithm is necessary (rather than just
+            # doing some time stamp arithmetic) because of the possibility that DST
+            # changes in the middle of an interval
+            delta = datetime.timedelta(seconds=interval)
+            last_stamp1 = 0
+            while dt1 < rev_stop_dt:
+                dt2 = min(dt1 + delta, rev_stop_dt)
+                stamp1 = int(time.mktime(dt1.timetuple()))
+                stamp2 = int(time.mktime(dt2.timetuple()))
+                if stamp2 > stamp1 > last_stamp1:
+                    yield TimeSpan(stamp1, stamp2)
+                    last_stamp1 = stamp1
+                dt1 = dt2
 
 
 # ==============================================================================
